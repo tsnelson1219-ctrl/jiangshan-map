@@ -1,4 +1,5 @@
 @echo off
 setlocal
-start "" powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0Start-Jiangshan-Map.ps1"
+title Jiangshan Atlas Launcher
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Start-Jiangshan-Map.ps1"
 endlocal
