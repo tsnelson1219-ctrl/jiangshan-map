@@ -8,7 +8,7 @@ DIST = ROOT / "dist"
 PACKAGE = DIST / "JiangshanAtlas_Portable"
 
 EXCLUDED_DIRS = {
-    ".git", ".github", "docs", "scripts", "skills", "data", "__pycache__",
+    ".git", ".github", "docs", "scripts", "skills", "data", "tools", "dist", "__pycache__",
 }
 EXCLUDED_FILES = {
     ".gitignore", ".dockerignore", "Dockerfile", "docker-compose.yml", "package-lock.json",
