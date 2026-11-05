@@ -1,0 +1,51 @@
+name: Build Windows Chrome Portable
+
+on:
+  push:
+    branches:
+      - feature/windows-chrome-portable
+    paths:
+      - "launcher/**"
+      - "tools/package_windows.py"
+      - ".github/workflows/build-windows-launcher.yml"
+      - "README_WINDOWS_ZH.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compile Windows launcher
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "dist" | Out-Null
+          $compiler = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          if (-not (Test-Path $compiler)) {
+            throw "The .NET Framework C# compiler was not found: $compiler"
+          }
+          & $compiler /nologo /target:winexe /platform:x64 /optimize+ /out:dist\JiangshanAtlas.exe /reference:System.Management.dll /reference:System.Windows.Forms.dll launcher\JiangshanLauncher.cs
+          if ($LASTEXITCODE -ne 0) {
+            throw "C# compilation failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Assemble portable folder
+        shell: pwsh
+        run: |
+          python tools\package_windows.py
+          Compress-Archive -Path dist\JiangshanAtlas_Portable -DestinationPath dist\JiangshanAtlas_Portable_Windows_x64.zip -Force
+
+      - name: Upload portable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: JiangshanAtlas-Windows-x64
+          path: |
+            dist/JiangshanAtlas.exe
+            dist/JiangshanAtlas_Portable_Windows_x64.zip
+          if-no-files-found: error
+          retention-days: 30
