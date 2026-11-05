@@ -203,27 +203,69 @@ try {
         '.wasm' = 'application/wasm'; '.pdf' = 'application/pdf'
     }
 
+    # Chrome may hand off startup to another browser process and exit its launcher PID.
+    # Track the actual browser process by its dedicated user-data-dir instead.
+    $getAtlasChrome = {
+        try {
+            $items = Get-CimInstance -ClassName Win32_Process -Filter "Name = 'chrome.exe'" -ErrorAction Stop
+            $items | Where-Object {
+                $_.CommandLine -and
+                $_.CommandLine.IndexOf($profileDir, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+                $_.CommandLine -notmatch '(?:^|\s)--type='
+            } | Select-Object -First 1
+        }
+        catch {
+            # On systems where process command lines cannot be queried, keep the
+            # localhost server alive while Chrome is running rather than stopping it early.
+            Get-Process -Name chrome -ErrorAction SilentlyContinue | Select-Object -First 1
+        }
+    }
+
+    $deadline = (Get-Date).AddSeconds(30)
+    $chromeSession = & $getAtlasChrome
+    while (-not $chromeSession -and (Get-Date) -lt $deadline) {
+        Start-Sleep -Milliseconds 400
+        $chromeSession = & $getAtlasChrome
+    }
+    if (-not $chromeSession) {
+        throw 'Chrome 啟動後未偵測到江山時序視窗。請確認 Chrome 可正常開啟，並查看啟動錯誤訊息。'
+    }
+
+    Write-Host ''
+    Write-Host '江山時序已啟動。' -ForegroundColor Green
+    Write-Host "Chrome 位址：$url"
+    Write-Host '關閉 Chrome 的江山時序視窗後，本機服務會自動結束。'
+    Write-Host ''
+
     $acceptTask = $listener.AcceptTcpClientAsync()
-    while (-not $browser.HasExited) {
+    $lastProcessCheck = Get-Date
+    while ($true) {
+        if (((Get-Date) - $lastProcessCheck).TotalSeconds -ge 1) {
+            $chromeSession = & $getAtlasChrome
+            if (-not $chromeSession) { break }
+            $lastProcessCheck = Get-Date
+        }
+
         if ($acceptTask.Wait(300)) {
             $client = $acceptTask.Result
             Handle-Client -Client $client -Port $port -Root $root -Mime $mime
-            if (-not $browser.HasExited) { $acceptTask = $listener.AcceptTcpClientAsync() }
+            $acceptTask = $listener.AcceptTcpClientAsync()
         }
     }
 }
 catch {
+    $errorMessage = $_ | Out-String
     try {
         New-Item -ItemType Directory -Force -Path (Split-Path $logPath) | Out-Null
-        $_ | Out-String | Set-Content -LiteralPath $logPath -Encoding UTF8
-        Add-Type -AssemblyName System.Windows.Forms
-        [System.Windows.Forms.MessageBox]::Show(
-            $_.Exception.Message, '江山時序啟動失敗',
-            [System.Windows.Forms.MessageBoxButtons]::OK,
-            [System.Windows.Forms.MessageBoxIcon]::Error
-        ) | Out-Null
+        $errorMessage | Set-Content -LiteralPath $logPath -Encoding UTF8
     }
     catch {}
+    Write-Host ''
+    Write-Host '江山時序啟動失敗：' -ForegroundColor Red
+    Write-Host $errorMessage -ForegroundColor Yellow
+    Write-Host "錯誤紀錄：$logPath"
+    Write-Host ''
+    Read-Host '按 Enter 關閉此視窗'
 }
 finally {
     if ($listener) { try { $listener.Stop() } catch {} }
