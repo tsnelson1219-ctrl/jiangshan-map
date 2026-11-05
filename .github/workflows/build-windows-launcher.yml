@@ -9,6 +9,14 @@ on:
       - "tools/package_windows.py"
       - ".github/workflows/build-windows-launcher.yml"
       - "README_WINDOWS_ZH.md"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "launcher/**"
+      - "tools/package_windows.py"
+      - ".github/workflows/build-windows-launcher.yml"
+      - "README_WINDOWS_ZH.md"
   workflow_dispatch:
 
 permissions:
